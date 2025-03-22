@@ -11,13 +11,12 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
-import { CalendarIcon } from "@radix-ui/react-icons"
 import { useState } from "react"
 import { toast } from "@/components/ui/use-toast"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import Link from "next/link"
-import { ArrowLeft, Eye, EyeOff } from "lucide-react"
+import { ArrowLeft, Eye, EyeOff, CalendarIcon } from "lucide-react"
 import { Logo } from "@/components/logo"
 
 const registerSchema = z.object({
@@ -243,4 +242,5 @@ export default function RegisterPage() {
     </div>
   )
 }
+
 
