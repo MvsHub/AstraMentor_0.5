@@ -6,14 +6,14 @@ import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
-import { ArrowLeft, Eye, EyeOff } from "lucide-react"
+import { ArrowLeft, Eye, EyeOff } from 'lucide-react'
 
 import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { toast } from "@/components/ui/use-toast"
 import { Logo } from "@/components/logo"
-import { useAuth } from "@/contexts/auth-context"
+import { supabase } from "@/lib/supabase"
 
 const loginSchema = z.object({
   email: z.string().email({
@@ -26,7 +26,6 @@ const loginSchema = z.object({
 
 export default function LoginPage() {
   const router = useRouter()
-  const { login } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [loginError, setLoginError] = useState<string | null>(null)
@@ -44,25 +43,58 @@ export default function LoginPage() {
     setLoginError(null)
 
     try {
-      const result = await login(values.email, values.password)
+      // Fazer login com Supabase
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: values.email,
+        password: values.password,
+      })
 
-      if (result.success) {
-        toast({
-          title: "Login realizado com sucesso!",
-          description: result.message,
-        })
-
-        // Redirecionar para dashboard após login bem-sucedido
-        // Adicionando um pequeno atraso para garantir que o estado seja atualizado
-        setTimeout(() => {
-          router.push("/dashboard")
-        }, 500)
-      } else {
-        setLoginError(result.message)
+      if (error) {
+        console.error("Erro de login:", error)
+        setLoginError(error.message)
+        setIsLoading(false)
+        return
       }
+
+      // Buscar perfil do usuário
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', data.user.id)
+        .single()
+
+      if (profileError) {
+        console.error("Erro ao buscar perfil:", profileError)
+        setLoginError("Erro ao buscar perfil de usuário. Verifique se o registro foi concluído corretamente.")
+        setIsLoading(false)
+        return
+      }
+
+      // Criar objeto de perfil do usuário
+      const userProfile = {
+        name: profileData.name,
+        email: profileData.email,
+        userType: profileData.user_type,
+        registrationNumber: profileData.registration_number,
+        avatar: profileData.avatar_url,
+      }
+
+      // Armazenar informações do usuário
+      localStorage.setItem("authToken", data.session.access_token)
+      localStorage.setItem("userProfile", JSON.stringify(userProfile))
+
+      toast({
+        title: "Login realizado com sucesso!",
+        description: `Bem-vindo, ${profileData.user_type === "student" ? "Aluno" : "Professor"} ${profileData.name}!`,
+      })
+
+      // Redirecionar para dashboard
+      setTimeout(() => {
+        router.push("/dashboard")
+      }, 500)
     } catch (error) {
+      console.error("Erro durante login:", error)
       setLoginError("Ocorreu um erro durante o login. Tente novamente.")
-      console.error(error)
     } finally {
       setIsLoading(false)
     }
@@ -150,4 +182,3 @@ export default function LoginPage() {
     </div>
   )
 }
-
