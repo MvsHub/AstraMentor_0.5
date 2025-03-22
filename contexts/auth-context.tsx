@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
-import { api } from "@/lib/api"
+import { supabase } from "@/lib/supabase"
 
 export interface UserProfile {
   name: string
@@ -30,90 +30,130 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Verificar se o usuário já está autenticado
     const checkAuth = async () => {
       try {
-        // Verificar se há perfil salvo
-        const storedProfile = localStorage.getItem("userProfile")
-        const token = localStorage.getItem("authToken")
-
-        if (storedProfile) {
-          try {
-            const profile = JSON.parse(storedProfile) as UserProfile
-            setUser(profile)
-
-            // Se temos um perfil mas não um token, vamos criar um token
-            if (!token && profile.email) {
-              const result = await api.login(profile.email, "senha123")
-              if (result) {
-                localStorage.setItem("authToken", result.token)
-              }
-            }
-          } catch (error) {
-            console.error("Erro ao recuperar perfil do usuário:", error)
-            localStorage.removeItem("userProfile")
-          }
-        } else if (token) {
-          try {
-            const userData = await api.getCurrentUser(token)
-
-            if (userData) {
+        // Verificar se há uma sessão ativa no Supabase
+        const { data: sessionData } = await supabase.auth.getSession()
+        
+        if (sessionData.session) {
+          // Buscar perfil do usuário
+          const { data: userData } = await supabase.auth.getUser()
+          
+          if (userData.user) {
+            const { data: profileData, error: profileError } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', userData.user.id)
+              .single()
+            
+            if (!profileError && profileData) {
+              // Criar objeto de perfil do usuário
               const userProfile: UserProfile = {
-                name: userData.name,
-                email: userData.email,
-                userType: userData.userType,
-                registrationNumber: userData.registrationNumber,
-                avatar: userData.avatar,
+                name: profileData.name,
+                email: profileData.email,
+                userType: profileData.user_type,
+                registrationNumber: profileData.registration_number,
+                avatar: profileData.avatar_url,
               }
-
+              
               setUser(userProfile)
               localStorage.setItem("userProfile", JSON.stringify(userProfile))
-            } else {
-              // Token inválido ou expirado
-              localStorage.removeItem("authToken")
             }
-          } catch (error) {
-            console.error("Erro ao verificar autenticação:", error)
-            localStorage.removeItem("authToken")
+          }
+        } else {
+          // Verificar se há perfil salvo no localStorage
+          const storedProfile = localStorage.getItem("userProfile")
+          if (storedProfile) {
+            try {
+              const profile = JSON.parse(storedProfile) as UserProfile
+              setUser(profile)
+            } catch (error) {
+              console.error("Erro ao recuperar perfil do usuário:", error)
+              localStorage.removeItem("userProfile")
+            }
           }
         }
-
-        setIsLoading(false)
       } catch (error) {
         console.error("Erro ao verificar autenticação:", error)
+      } finally {
         setIsLoading(false)
       }
     }
 
     checkAuth()
+
+    // Configurar listener para mudanças de autenticação
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session) {
+        // Buscar perfil do usuário quando a sessão mudar
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+        
+        if (!profileError && profileData) {
+          const userProfile: UserProfile = {
+            name: profileData.name,
+            email: profileData.email,
+            userType: profileData.user_type,
+            registrationNumber: profileData.registration_number,
+            avatar: profileData.avatar_url,
+          }
+          
+          setUser(userProfile)
+          localStorage.setItem("userProfile", JSON.stringify(userProfile))
+        }
+      } else {
+        setUser(null)
+        localStorage.removeItem("userProfile")
+      }
+      setIsLoading(false)
+    })
+
+    return () => {
+      authListener.subscription.unsubscribe()
+    }
   }, [])
 
   const login = async (email: string, password: string) => {
     try {
-      const result = await api.login(email, password)
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-      if (!result) {
-        return { success: false, message: "Email ou senha incorretos." }
+      if (error) {
+        return { success: false, message: error.message }
       }
 
-      const { user, token } = result
+      // Buscar perfil do usuário
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', data.user.id)
+        .single()
+
+      if (profileError) {
+        return { 
+          success: false, 
+          message: "Erro ao buscar perfil de usuário. Verifique se o registro foi concluído corretamente." 
+        }
+      }
 
       // Criar objeto de perfil do usuário
       const userProfile: UserProfile = {
-        name: user.name,
-        email: user.email,
-        userType: user.userType,
-        registrationNumber: user.registrationNumber,
-        avatar: user.avatar,
+        name: profileData.name,
+        email: profileData.email,
+        userType: profileData.user_type,
+        registrationNumber: profileData.registration_number,
+        avatar: profileData.avatar_url,
       }
-
-      // Armazenar informações do usuário e token
-      localStorage.setItem("authToken", token)
-      localStorage.setItem("userProfile", JSON.stringify(userProfile))
-
-      // Definir o usuário no estado imediatamente
+      
       setUser(userProfile)
+      localStorage.setItem("userProfile", JSON.stringify(userProfile))
 
       return {
         success: true,
-        message: `Bem-vindo, ${user.userType === "student" ? "Aluno" : "Professor"} ${user.name}!`,
+        message: `Bem-vindo, ${profileData.user_type === "student" ? "Aluno" : "Professor"} ${profileData.name}!`,
       }
     } catch (error) {
       console.error("Erro durante login:", error)
@@ -124,10 +164,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const logout = () => {
-    localStorage.removeItem("authToken")
-    localStorage.removeItem("userProfile")
+  const logout = async () => {
+    await supabase.auth.signOut()
     setUser(null)
+    localStorage.removeItem("userProfile")
     router.push("/")
   }
 
@@ -137,8 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext)
   if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider")
+    throw new Error("useAuth deve ser usado dentro de um AuthProvider")
   }
   return context
 }
-
