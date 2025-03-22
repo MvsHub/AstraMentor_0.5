@@ -81,14 +81,12 @@ export default function RegisterPage() {
         email: values.email,
         password: values.password,
         options: {
+          emailRedirectTo: `${window.location.origin}/login`,
           data: {
-            // Enviamos tanto fullName quanto full_name para compatibilidade
+            // Usamos os nomes exatos que o trigger espera
             fullName: values.fullName,
-            full_name: values.fullName,
-            // Enviamos tanto userType quanto user_type para compatibilidade
             userType: values.userType,
-            user_type: values.userType,
-            birth_date: values.birthDate
+            birthDate: values.birthDate
           }
         }
       })
