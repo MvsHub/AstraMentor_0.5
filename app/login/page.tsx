@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -29,6 +29,19 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [loginError, setLoginError] = useState<string | null>(null)
+
+  // Verificar se o usuário já está autenticado
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession()
+      if (data.session) {
+        console.log("Usuário já autenticado, redirecionando...")
+        window.location.href = "/dashboard"
+      }
+    }
+
+    checkSession()
+  }, [router])
 
   const form = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -121,11 +134,9 @@ export default function LoginPage() {
           description: `Bem-vindo, ${userProfile.name}!`,
         })
 
-        // Redirecionar para dashboard
-        setTimeout(() => {
-          router.push("/dashboard")
-        }, 500)
-
+        // Redirecionar para dashboard - FORÇANDO REDIRECIONAMENTO
+        console.log("Redirecionando para dashboard...")
+        window.location.href = "/dashboard"
         return
       }
 
@@ -147,10 +158,9 @@ export default function LoginPage() {
         description: `Bem-vindo, ${profileData.user_type === "student" ? "Aluno" : "Professor"} ${profileData.name}!`,
       })
 
-      // Redirecionar para dashboard
-      setTimeout(() => {
-        router.push("/dashboard")
-      }, 500)
+      // Redirecionar para dashboard - FORÇANDO REDIRECIONAMENTO
+      console.log("Redirecionando para dashboard...")
+      window.location.href = "/dashboard"
     } catch (error) {
       console.error("Erro durante login:", error)
       setLoginError("Ocorreu um erro durante o login. Tente novamente.")
@@ -229,5 +239,6 @@ export default function LoginPage() {
     </div>
   )
 }
+
 
 
