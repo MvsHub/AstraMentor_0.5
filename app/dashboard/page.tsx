@@ -4,6 +4,7 @@ import { DashboardShell } from "@/components/dashboard-shell"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { PostCard } from "@/components/post-card"
+import { AuthGuard } from "@/components/auth-guard"
 
 export const metadata: Metadata = {
   title: "Dashboard | AstraMentor",
@@ -58,7 +59,7 @@ export default function DashboardPage() {
   ]
 
   return (
-    <>
+    <AuthGuard>
       <DashboardHeader />
       <DashboardShell>
         <div className="grid gap-6">
@@ -176,7 +177,8 @@ export default function DashboardPage() {
           </div>
         </div>
       </DashboardShell>
-    </>
+    </AuthGuard>
   )
 }
+
 
