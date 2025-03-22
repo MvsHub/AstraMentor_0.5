@@ -43,6 +43,8 @@ export default function LoginPage() {
     setLoginError(null)
 
     try {
+      console.log("Tentando login com:", values.email);
+      
       // Fazer login com Supabase
       const { data, error } = await supabase.auth.signInWithPassword({
         email: values.email,
@@ -56,6 +58,8 @@ export default function LoginPage() {
         return
       }
 
+      console.log("Login bem-sucedido:", data);
+
       // Buscar perfil do usuário
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
@@ -65,12 +69,68 @@ export default function LoginPage() {
 
       if (profileError) {
         console.error("Erro ao buscar perfil:", profileError)
-        setLoginError("Erro ao buscar perfil de usuário. Verifique se o registro foi concluído corretamente.")
-        setIsLoading(false)
+        
+        // Tentar criar um perfil básico se não existir
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert([
+            {
+              id: data.user.id,
+              email: data.user.email,
+              name: data.user.user_metadata.full_name || "Usuário",
+              user_type: data.user.user_metadata.user_type || "student",
+              registration_number: data.user.user_metadata.registration_number || `A${Math.floor(1000 + Math.random() * 9000)}`
+            }
+          ])
+          
+        if (insertError) {
+          console.error("Erro ao criar perfil:", insertError)
+          setLoginError("Erro ao buscar ou criar perfil de usuário")
+          setIsLoading(false)
+          return
+        }
+        
+        // Buscar o perfil recém-criado
+        const { data: newProfileData, error: newProfileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single()
+          
+        if (newProfileError) {
+          console.error("Erro ao buscar novo perfil:", newProfileError)
+          setLoginError("Erro ao buscar perfil de usuário")
+          setIsLoading(false)
+          return
+        }
+        
+        // Usar o novo perfil
+        const userProfile = {
+          name: newProfileData.name,
+          email: newProfileData.email,
+          userType: newProfileData.user_type,
+          registrationNumber: newProfileData.registration_number,
+          avatar: newProfileData.avatar_url,
+        }
+        
+        // Armazenar informações do usuário
+        localStorage.setItem("authToken", data.session.access_token)
+        localStorage.setItem("userProfile", JSON.stringify(userProfile))
+        
+        toast({
+          title: "Login realizado com sucesso!",
+          description: `Bem-vindo, ${userProfile.name}!`,
+        })
+        
+        // Redirecionar para dashboard
+        setTimeout(() => {
+          router.push("/dashboard")
+        }, 500)
+        
         return
       }
 
-      // Criar objeto de perfil do usuário
+      // Se chegou aqui, o perfil foi encontrado
       const userProfile = {
         name: profileData.name,
         email: profileData.email,
@@ -171,13 +231,6 @@ export default function LoginPage() {
             Registre-se
           </Link>
         </p>
-
-        {/* Informações de teste para facilitar o desenvolvimento */}
-        <div className="mt-8 border-t pt-4 text-xs text-muted-foreground">
-          <p className="mb-1 font-medium">Contas para teste:</p>
-          <p>Aluno: aluno@exemplo.com / senha123</p>
-          <p>Professor: professor@exemplo.com / senha123</p>
-        </div>
       </div>
     </div>
   )
