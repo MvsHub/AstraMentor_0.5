@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
-import { ArrowLeft, Eye, EyeOff } from 'lucide-react'
+import { ArrowLeft, Eye, EyeOff } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
@@ -43,8 +43,8 @@ export default function LoginPage() {
     setLoginError(null)
 
     try {
-      console.log("Tentando login com:", values.email);
-      
+      console.log("Tentando login com:", values.email)
+
       // Fazer login com Supabase
       const { data, error } = await supabase.auth.signInWithPassword({
         email: values.email,
@@ -58,55 +58,51 @@ export default function LoginPage() {
         return
       }
 
-      console.log("Login bem-sucedido:", data);
+      console.log("Login bem-sucedido:", data)
 
       // Buscar perfil do usuário
       const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', data.user.id)
+        .from("profiles")
+        .select("*")
+        .eq("id", data.user.id)
         .single()
 
       if (profileError) {
         console.error("Erro ao buscar perfil:", profileError)
-        
+
         // Tentar criar um perfil básico se não existir
-        const userMetadata = data.user.user_metadata;
-        const { error: insertError } = await supabase
-          .from('profiles')
-          .insert([
-            {
-              id: data.user.id,
-              name: userMetadata.fullName || 'Usuário',
-              email: data.user.email,
-              user_type: userMetadata.userType || 'student',
-              registration_number: `A${Math.floor(1000 + Math.random() * 9000)}`,
-              created_at: new Date(),
-              updated_at: new Date()
-            }
-          ])
-          
+        const { error: insertError } = await supabase.from("profiles").insert([
+          {
+            id: data.user.id,
+            email: data.user.email,
+            name: data.user.user_metadata.fullName || "Usuário",
+            user_type: data.user.user_metadata.userType || "student",
+            registration_number:
+              data.user.user_metadata.registration_number || `A${Math.floor(1000 + Math.random() * 9000)}`,
+          },
+        ])
+
         if (insertError) {
           console.error("Erro ao criar perfil:", insertError)
           setLoginError("Erro ao buscar ou criar perfil de usuário")
           setIsLoading(false)
           return
         }
-        
+
         // Buscar o perfil recém-criado
         const { data: newProfileData, error: newProfileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', data.user.id)
+          .from("profiles")
+          .select("*")
+          .eq("id", data.user.id)
           .single()
-          
+
         if (newProfileError) {
           console.error("Erro ao buscar novo perfil:", newProfileError)
           setLoginError("Erro ao buscar perfil de usuário")
           setIsLoading(false)
           return
         }
-        
+
         // Usar o novo perfil
         const userProfile = {
           name: newProfileData.name,
@@ -115,21 +111,21 @@ export default function LoginPage() {
           registrationNumber: newProfileData.registration_number,
           avatar: newProfileData.avatar_url,
         }
-        
+
         // Armazenar informações do usuário
         localStorage.setItem("authToken", data.session.access_token)
         localStorage.setItem("userProfile", JSON.stringify(userProfile))
-        
+
         toast({
           title: "Login realizado com sucesso!",
           description: `Bem-vindo, ${userProfile.name}!`,
         })
-        
+
         // Redirecionar para dashboard
         setTimeout(() => {
           router.push("/dashboard")
         }, 500)
-        
+
         return
       }
 
@@ -213,11 +209,6 @@ export default function LoginPage() {
                       </Button>
                     </div>
                   </FormControl>
-                  <div className="flex justify-end">
-                    <Link href="/forgot-password" className="text-sm text-muted-foreground hover:text-primary">
-                      Esqueceu a senha?
-                    </Link>
-                  </div>
                   <FormMessage />
                 </FormItem>
               )}
@@ -238,3 +229,5 @@ export default function LoginPage() {
     </div>
   )
 }
+
+
