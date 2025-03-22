@@ -1,94 +1,76 @@
 "use client"
 
-import { useState } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
-import { z } from "zod"
-import { ArrowLeft, Eye, EyeOff } from 'lucide-react'
-
+import * as z from "zod"
 import { Button } from "@/components/ui/button"
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
+import { format } from "date-fns"
+import { CalendarIcon } from "@radix-ui/react-icons"
+import { useState } from "react"
 import { toast } from "@/components/ui/use-toast"
-import { Logo } from "@/components/logo"
+import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
+import Link from "next/link"
+import { ArrowLeft, Eye, EyeOff } from "lucide-react"
+import { Logo } from "@/components/logo"
 
-const registerSchema = z
-  .object({
-    fullName: z.string().min(3, {
-      message: "Nome completo deve ter pelo menos 3 caracteres.",
-    }),
-    birthDate: z.string().refine(
-      (date) => {
-        const birthDate = new Date(date)
-        const today = new Date()
-        const age = today.getFullYear() - birthDate.getFullYear()
-        return age >= 13
-      },
-      {
-        message: "Você deve ter pelo menos 13 anos para se registrar.",
-      },
-    ),
-    email: z.string().email({
-      message: "Email inválido.",
-    }),
-    password: z.string().min(8, {
-      message: "Senha deve ter pelo menos 8 caracteres.",
-    }),
-    confirmPassword: z.string(),
-    userType: z.enum(["student", "teacher"], {
-      required_error: "Você deve selecionar um tipo de usuário.",
-    }),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "As senhas não coincidem.",
-    path: ["confirmPassword"],
-  })
+const registerSchema = z.object({
+  fullName: z.string().min(2, {
+    message: "Nome completo deve ter pelo menos 2 caracteres.",
+  }),
+  email: z.string().email({
+    message: "Por favor, insira um email válido.",
+  }),
+  password: z.string().min(8, {
+    message: "Senha deve ter pelo menos 8 caracteres.",
+  }),
+  userType: z.enum(["student", "teacher"], {
+    required_error: "Você precisa selecionar um tipo de usuário.",
+  }),
+  birthDate: z.date({
+    required_error: "Uma data de nascimento é necessária.",
+  }),
+})
 
 export default function RegisterPage() {
-  const router = useRouter()
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const router = useRouter()
 
   const form = useForm<z.infer<typeof registerSchema>>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
       fullName: "",
-      birthDate: "",
       email: "",
       password: "",
-      confirmPassword: "",
       userType: "student",
+      birthDate: new Date(),
     },
   })
 
   async function onSubmit(values: z.infer<typeof registerSchema>) {
     setIsLoading(true)
-    
+
     try {
-      console.log("Iniciando registro com:", { 
-        email: values.email, 
-        userType: values.userType,
-        fullName: values.fullName
-      });
-      
+      console.log("Iniciando registro com:", values)
+
       // Registrar usuário no Supabase Auth
       const { data, error } = await supabase.auth.signUp({
         email: values.email,
         password: values.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/login`,
           data: {
-            // Usamos os nomes exatos que o trigger espera
             fullName: values.fullName,
             userType: values.userType,
-            birthDate: values.birthDate
-          }
-        }
+            birthDate: values.birthDate,
+          },
+        },
       })
 
       if (error) {
@@ -102,8 +84,8 @@ export default function RegisterPage() {
         return
       }
 
-      console.log("Registro bem-sucedido:", data);
-      
+      console.log("Registro bem-sucedido:", data)
+
       toast({
         title: "Registro realizado com sucesso!",
         description: "Você será redirecionado para a página de login.",
@@ -137,7 +119,7 @@ export default function RegisterPage() {
       <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
         <div className="flex flex-col space-y-2 text-center">
           <h1 className="text-2xl font-semibold tracking-tight">Criar uma conta</h1>
-          <p className="text-sm text-muted-foreground">Preencha os campos abaixo para se registrar</p>
+          <p className="text-sm text-muted-foreground">Preencha os dados abaixo para se registrar</p>
         </div>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -156,25 +138,12 @@ export default function RegisterPage() {
             />
             <FormField
               control={form.control}
-              name="birthDate"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Data de Nascimento</FormLabel>
-                  <FormControl>
-                    <Input type="date" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
               name="email"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input type="email" placeholder="exemplo@email.com" {...field} />
+                    <Input placeholder="joao@email.com" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -201,32 +170,6 @@ export default function RegisterPage() {
                       </Button>
                     </div>
                   </FormControl>
-                  <FormDescription>Mínimo de 8 caracteres</FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="confirmPassword"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Confirmar Senha</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Input type={showConfirmPassword ? "text" : "password"} placeholder="********" {...field} />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-0 top-0 h-full px-3"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      >
-                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        <span className="sr-only">{showConfirmPassword ? "Esconder senha" : "Mostrar senha"}</span>
-                      </Button>
-                    </div>
-                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -235,32 +178,56 @@ export default function RegisterPage() {
               control={form.control}
               name="userType"
               render={({ field }) => (
-                <FormItem className="space-y-3">
+                <FormItem>
                   <FormLabel>Tipo de Usuário</FormLabel>
-                  <FormControl>
-                    <RadioGroup
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                      className="flex flex-col space-y-1"
-                    >
-                      <FormItem className="flex items-center space-x-3 space-y-0">
-                        <FormControl>
-                          <RadioGroupItem value="student" />
-                        </FormControl>
-                        <FormLabel className="font-normal">Aluno</FormLabel>
-                      </FormItem>
-                      <FormItem className="flex items-center space-x-3 space-y-0">
-                        <FormControl>
-                          <RadioGroupItem value="teacher" />
-                        </FormControl>
-                        <FormLabel className="font-normal">Professor</FormLabel>
-                      </FormItem>
-                    </RadioGroup>
-                  </FormControl>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione um tipo de usuário" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="student">Aluno</SelectItem>
+                      <SelectItem value="teacher">Professor</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="birthDate"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>Data de Nascimento</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant={"outline"}
+                          className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
+                        >
+                          {field.value ? format(field.value, "dd/MM/yyyy") : <span>Escolha uma data</span>}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={field.onChange}
+                        disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <Button type="submit" className="w-full bg-brand-teal hover:bg-brand-teal/90" disabled={isLoading}>
               {isLoading ? "Registrando..." : "Registrar"}
             </Button>
@@ -276,3 +243,4 @@ export default function RegisterPage() {
     </div>
   )
 }
+
