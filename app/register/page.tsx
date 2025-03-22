@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
-import { ArrowLeft, Eye, EyeOff } from "lucide-react"
+import { ArrowLeft, Eye, EyeOff } from 'lucide-react'
 
 import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { toast } from "@/components/ui/use-toast"
 import { Logo } from "@/components/logo"
+import { supabase } from "@/lib/supabase"
 
 const registerSchema = z
   .object({
@@ -51,6 +52,7 @@ export default function RegisterPage() {
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
 
   const form = useForm<z.infer<typeof registerSchema>>({
     resolver: zodResolver(registerSchema),
@@ -64,25 +66,60 @@ export default function RegisterPage() {
     },
   })
 
-  function onSubmit(values: z.infer<typeof registerSchema>) {
-    // Simulação de registro - em uma implementação real, isso seria uma chamada API
-    console.log(values)
+  async function onSubmit(values: z.infer<typeof registerSchema>) {
+    setIsLoading(true)
+    
+    try {
+      // Gerar número de registro acadêmico
+      const registrationNumber =
+        values.userType === "student"
+          ? `A${Math.floor(1000 + Math.random() * 9000)}`
+          : `P${Math.floor(1000 + Math.random() * 9000)}`
+      
+      // Registrar usuário no Supabase Auth
+      const { data, error } = await supabase.auth.signUp({
+        email: values.email,
+        password: values.password,
+        options: {
+          data: {
+            fullName: values.fullName,
+            userType: values.userType,
+            birthDate: values.birthDate,
+            registrationNumber: registrationNumber
+          }
+        }
+      })
 
-    // Gerar número de registro acadêmico
-    const registrationNumber =
-      values.userType === "student"
-        ? `A${Math.floor(1000 + Math.random() * 9000)}`
-        : `P${Math.floor(1000 + Math.random() * 9000)}`
+      if (error) {
+        console.error("Erro no registro:", error)
+        toast({
+          title: "Erro no registro",
+          description: error.message,
+          variant: "destructive",
+        })
+        setIsLoading(false)
+        return
+      }
 
-    toast({
-      title: "Registro realizado com sucesso!",
-      description: `Seu número de registro é: ${registrationNumber}. Um email de confirmação foi enviado para ${values.email}.`,
-    })
+      toast({
+        title: "Registro realizado com sucesso!",
+        description: `Seu número de registro é: ${registrationNumber}. Um email de confirmação foi enviado para ${values.email}.`,
+      })
 
-    // Redirecionar para login após registro bem-sucedido
-    setTimeout(() => {
-      router.push("/login")
-    }, 2000)
+      // Redirecionar para login após registro bem-sucedido
+      setTimeout(() => {
+        router.push("/login")
+      }, 2000)
+    } catch (error) {
+      console.error("Erro durante registro:", error)
+      toast({
+        title: "Erro",
+        description: "Ocorreu um erro durante o registro. Tente novamente.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -221,8 +258,8 @@ export default function RegisterPage() {
                 </FormItem>
               )}
             />
-            <Button type="submit" className="w-full bg-brand-teal hover:bg-brand-teal/90">
-              Registrar
+            <Button type="submit" className="w-full bg-brand-teal hover:bg-brand-teal/90" disabled={isLoading}>
+              {isLoading ? "Registrando..." : "Registrar"}
             </Button>
           </form>
         </Form>
@@ -236,4 +273,3 @@ export default function RegisterPage() {
     </div>
   )
 }
-
