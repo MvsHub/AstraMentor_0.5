@@ -70,12 +70,6 @@ export default function RegisterPage() {
     setIsLoading(true)
     
     try {
-      // Gerar número de registro acadêmico
-      const registrationNumber =
-        values.userType === "student"
-          ? `A${Math.floor(1000 + Math.random() * 9000)}`
-          : `P${Math.floor(1000 + Math.random() * 9000)}`
-      
       console.log("Iniciando registro com:", { 
         email: values.email, 
         userType: values.userType,
@@ -88,10 +82,13 @@ export default function RegisterPage() {
         password: values.password,
         options: {
           data: {
+            // Enviamos tanto fullName quanto full_name para compatibilidade
+            fullName: values.fullName,
             full_name: values.fullName,
+            // Enviamos tanto userType quanto user_type para compatibilidade
+            userType: values.userType,
             user_type: values.userType,
-            birth_date: values.birthDate,
-            registration_number: registrationNumber
+            birth_date: values.birthDate
           }
         }
       })
@@ -109,29 +106,9 @@ export default function RegisterPage() {
 
       console.log("Registro bem-sucedido:", data);
       
-      // Inserir manualmente na tabela profiles se necessário
-      if (data.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([
-            {
-              id: data.user.id,
-              name: values.fullName,
-              email: values.email,
-              user_type: values.userType,
-              birth_date: values.birthDate,
-              registration_number: registrationNumber
-            }
-          ])
-          
-        if (profileError) {
-          console.error("Erro ao criar perfil:", profileError)
-        }
-      }
-
       toast({
         title: "Registro realizado com sucesso!",
-        description: `Seu número de registro é: ${registrationNumber}. Você será redirecionado para a página de login.`,
+        description: "Você será redirecionado para a página de login.",
       })
 
       // Redirecionar para login após registro bem-sucedido
